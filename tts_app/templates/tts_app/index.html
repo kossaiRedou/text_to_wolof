@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fatou BRAVO — Générateur Wolof</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --green:   #1a7a4a;
+      --green-l: #25a863;
+      --gold:    #e8a020;
+      --gold-l:  #f5c842;
+      --cream:   #fdf6e3;
+      --dark:    #0f1a12;
+      --text:    #1e2d23;
+      --muted:   #6b7c6e;
+      --card:    #ffffff;
+      --border:  #d4e8d8;
+      --error:   #c0392b;
+      --success: #1a7a4a;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--cream);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── BACKGROUND PATTERN ── */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(26,122,74,.06) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(232,160,32,.08) 0%, transparent 50%),
+        url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 5 L55 20 L55 40 L30 55 L5 40 L5 20Z' fill='none' stroke='%231a7a4a' stroke-width='.3' opacity='.15'/%3E%3C/svg%3E");
+      background-size: auto, auto, 60px 60px;
+      pointer-events: none;
+    }
+
+    /* ── LAYOUT ── */
+    .page { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 3rem 1.5rem 5rem; }
+
+    /* ── HEADER ── */
+    header { text-align: center; margin-bottom: 3.5rem; }
+
+    .avatar-ring {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 96px; height: 96px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--green), var(--gold));
+      margin-bottom: 1.2rem;
+      box-shadow: 0 8px 32px rgba(26,122,74,.35);
+      font-size: 3rem;
+    }
+
+    h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--green) 0%, var(--gold) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.1;
+      margin-bottom: .5rem;
+    }
+
+    .tagline {
+      font-size: .95rem;
+      color: var(--muted);
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    /* ── MODE TABS ── */
+    .tabs {
+      display: flex; gap: .5rem; justify-content: center;
+      margin-bottom: 2.5rem;
+      background: rgba(255,255,255,.6);
+      border: 1px solid var(--border);
+      border-radius: 2rem;
+      padding: .4rem;
+      backdrop-filter: blur(8px);
+    }
+
+    .tab {
+      flex: 1; padding: .7rem 1rem;
+      border: none; border-radius: 1.6rem;
+      font-family: 'DM Sans', sans-serif; font-size: .9rem; font-weight: 500;
+      cursor: pointer; transition: all .25s;
+      background: transparent; color: var(--muted);
+    }
+
+    .tab.active {
+      background: linear-gradient(135deg, var(--green), var(--green-l));
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(26,122,74,.3);
+    }
+
+    /* ── CARD ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 1.5rem;
+      padding: 2.2rem;
+      box-shadow: 0 4px 24px rgba(15,26,18,.06);
+      margin-bottom: 1.5rem;
+    }
+
+    .card-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.2rem;
+      color: var(--green);
+      margin-bottom: 1.2rem;
+      display: flex; align-items: center; gap: .5rem;
+    }
+
+    /* ── FORM ELEMENTS ── */
+    label { font-size: .85rem; font-weight: 500; color: var(--muted); display: block; margin-bottom: .4rem; text-transform: uppercase; letter-spacing: .05em; }
+
+    textarea {
+      width: 100%; min-height: 130px;
+      padding: 1rem 1.2rem;
+      border: 1.5px solid var(--border);
+      border-radius: 1rem;
+      font-family: 'DM Sans', sans-serif; font-size: 1rem;
+      background: #f8fcf9; color: var(--text);
+      resize: vertical;
+      transition: border-color .2s;
+      outline: none;
+    }
+    textarea:focus { border-color: var(--green-l); box-shadow: 0 0 0 3px rgba(37,168,99,.12); }
+
+    .char-count { font-size: .78rem; color: var(--muted); text-align: right; margin-top: .3rem; }
+    .char-count.warn { color: var(--error); }
+
+    /* ── CONTROLS ROW ── */
+    .controls-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.2rem; }
+
+    .slider-group label { margin-bottom: .5rem; }
+
+    .slider-wrap { display: flex; align-items: center; gap: .8rem; }
+
+    input[type=range] {
+      flex: 1; height: 4px;
+      -webkit-appearance: none;
+      background: linear-gradient(to right, var(--green-l) 0%, var(--border) 0%);
+      border-radius: 2px; outline: none; cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 2px 8px rgba(26,122,74,.4);
+      cursor: pointer;
+    }
+
+    .slider-val {
+      min-width: 2.5rem; text-align: center;
+      font-weight: 500; font-size: .9rem;
+      color: var(--green);
+      background: #f0faf4; border-radius: .5rem;
+      padding: .2rem .5rem;
+    }
+
+    /* ── BUTTONS ── */
+    .btn-row { display: flex; gap: 1rem; margin-top: 1.8rem; flex-wrap: wrap; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: .5rem;
+      padding: .85rem 1.8rem;
+      border: none; border-radius: 3rem;
+      font-family: 'DM Sans', sans-serif; font-size: .95rem; font-weight: 500;
+      cursor: pointer; transition: all .25s; text-decoration: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--green) 0%, var(--green-l) 100%);
+      color: #fff;
+      box-shadow: 0 4px 18px rgba(26,122,74,.35);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(26,122,74,.45); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1.5px solid var(--border);
+      color: var(--muted);
+    }
+    .btn-secondary:hover { border-color: var(--green-l); color: var(--green); }
+
+    .btn-gold {
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-l) 100%);
+      color: var(--dark);
+      box-shadow: 0 4px 18px rgba(232,160,32,.35);
+    }
+    .btn-gold:hover { transform: translateY(-2px); }
+
+    /* ── LOADING SPINNER ── */
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── RESULT SECTION ── */
+    .result-card { display: none; }
+    .result-card.show { display: block; animation: fadeUp .4s ease; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .result-label {
+      font-size: .78rem; font-weight: 500;
+      text-transform: uppercase; letter-spacing: .08em;
+      color: var(--muted); margin-bottom: .6rem;
+    }
+
+    .result-text {
+      background: #f0faf4;
+      border: 1px solid var(--border);
+      border-radius: .8rem;
+      padding: 1rem 1.2rem;
+      font-size: .95rem; line-height: 1.7;
+      color: var(--text);
+      min-height: 50px;
+      word-break: break-word;
+    }
+
+    .result-text.wolof {
+      font-size: 1.05rem;
+      border-left: 3px solid var(--green);
+    }
+
+    /* ── AUDIO PLAYER ── */
+    .audio-section {
+      margin-top: 1.2rem;
+      background: linear-gradient(135deg, #f0faf4, #fffdf0);
+      border: 1px solid var(--border);
+      border-radius: 1rem;
+      padding: 1.2rem;
+    }
+
+    .audio-section audio {
+      width: 100%; border-radius: .5rem; outline: none;
+      filter: sepia(.1) hue-rotate(90deg);
+    }
+
+    .download-row { display: flex; gap: .8rem; margin-top: .8rem; flex-wrap: wrap; }
+
+    /* ── STATUS / ALERT ── */
+    .alert {
+      padding: .9rem 1.2rem;
+      border-radius: .8rem;
+      font-size: .9rem;
+      margin-top: 1rem;
+      display: none;
+    }
+    .alert.show { display: flex; align-items: center; gap: .6rem; }
+    .alert-error { background: #fdf0f0; border: 1px solid #f5c6c6; color: var(--error); }
+    .alert-success { background: #f0faf4; border: 1px solid var(--border); color: var(--success); }
+
+    /* ── HISTORY TABLE ── */
+    .history-list { list-style: none; }
+    .history-item {
+      display: flex; align-items: center; gap: 1rem;
+      padding: .9rem 1rem;
+      border-radius: .8rem;
+      transition: background .2s;
+      cursor: pointer;
+    }
+    .history-item:hover { background: #f5fdf7; }
+    .history-item + .history-item { border-top: 1px solid var(--border); }
+    .history-item .hi-icon { font-size: 1.3rem; }
+    .history-item .hi-text { flex: 1; font-size: .9rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .history-item .hi-date { font-size: .78rem; color: var(--muted); white-space: nowrap; }
+
+    /* ── SCRIPT SAMPLES ── */
+    .samples-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .8rem; }
+    .sample-btn {
+      padding: .8rem 1rem;
+      background: #f8fcf9; border: 1.5px solid var(--border);
+      border-radius: .9rem; cursor: pointer; text-align: left;
+      transition: all .2s; font-family: 'DM Sans', sans-serif; font-size: .85rem;
+      color: var(--text);
+    }
+    .sample-btn:hover { border-color: var(--green-l); background: #f0faf4; }
+    .sample-btn strong { display: block; color: var(--green); font-size: .8rem; margin-bottom: .2rem; text-transform: uppercase; letter-spacing: .04em; }
+
+    /* ── FOOTER ── */
+    footer {
+      text-align: center; margin-top: 4rem;
+      font-size: .78rem; color: var(--muted); letter-spacing: .04em;
+    }
+    footer span { color: var(--green); }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <header>
+    <div class="avatar-ring">👩🏾</div>
+    <h1>Fatou BRAVO</h1>
+    <p class="tagline">Générateur de voix Wolof · Powered by LAfricaMobile</p>
+  </header>
+
+  <!-- MODE TABS -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('pipeline')" id="tab-pipeline">🚀 Générer (tout-en-un)</button>
+    <button class="tab" onclick="switchTab('translate')" id="tab-translate">🌍 Traduire seulement</button>
+    <button class="tab" onclick="switchTab('synthesize')" id="tab-synthesize">🎙️ Voix seulement</button>
+    <button class="tab" onclick="switchTab('history')" id="tab-history">📋 Historique</button>
+  </div>
+
+  <!-- ── TAB : PIPELINE COMPLET ── -->
+  <div id="pane-pipeline">
+    <div class="card">
+      <div class="card-title">🚀 Français → Wolof → Audio</div>
+
+      <!-- SCRIPTS RAPIDES -->
+      <div style="margin-bottom:1.2rem">
+        <label>Scripts Fatou BRAVO (cliquer pour utiliser)</label>
+        <div class="samples-grid">
+          <button class="sample-btn" onclick="fillText('pipeline', samples[0])">
+            <strong>🎬 Présentation</strong>Maa ngi tudd Fatou BRAVO...
+          </button>
+          <button class="sample-btn" onclick="fillText('pipeline', samples[1])">
+            <strong>🍳 Recette</strong>Bouillon BRAVO dafa neex...
+          </button>
+          <button class="sample-btn" onclick="fillText('pipeline', samples[2])">
+            <strong>📢 Promo</strong>Produits BRAVO ak jàmm...
+          </button>
+        </div>
+      </div>
+
+      <label>Texte en français <span style="color:var(--muted)">(max 512 caractères)</span></label>
+      <textarea id="text-pipeline" placeholder="Écrivez votre texte en français ici..." oninput="updateCount('pipeline')"></textarea>
+      <div class="char-count" id="count-pipeline">0 / 512</div>
+
+      <div class="controls-row">
+        <div class="slider-group">
+          <label>🎵 Pitch (tonalité)</label>
+          <div class="slider-wrap">
+            <input type="range" id="pitch-pipeline" min="-2" max="2" step="0.1" value="0" oninput="updateSlider('pitch-pipeline','val-pitch-pipeline')">
+            <span class="slider-val" id="val-pitch-pipeline">0.0</span>
+          </div>
+        </div>
+        <div class="slider-group">
+          <label>⏱️ Speed (vitesse)</label>
+          <div class="slider-wrap">
+            <input type="range" id="speed-pipeline" min="0.5" max="2" step="0.1" value="1" oninput="updateSlider('speed-pipeline','val-speed-pipeline')">
+            <span class="slider-val" id="val-speed-pipeline">1.0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runPipeline()" id="btn-pipeline">
+          <span>✨ Générer la voix Wolof</span>
+        </button>
+        <button class="btn btn-secondary" onclick="clearForm('pipeline')">Effacer</button>
+      </div>
+
+      <div class="alert alert-error" id="err-pipeline"></div>
+    </div>
+
+    <!-- RÉSULTAT PIPELINE -->
+    <div class="card result-card" id="res-pipeline">
+      <div class="card-title">✅ Résultat</div>
+      <div class="result-label">Texte original (Français)</div>
+      <div class="result-text" id="res-original"></div>
+      <div style="margin-top:1rem">
+        <div class="result-label">Texte traduit (Wolof)</div>
+        <div class="result-text wolof" id="res-wolof"></div>
+      </div>
+      <div class="audio-section" id="audio-section-pipeline" style="display:none">
+        <div class="result-label" style="margin-bottom:.8rem">🔊 Audio généré</div>
+        <audio controls id="audio-player-pipeline"></audio>
+        <div class="download-row">
+          <a class="btn btn-gold" id="dl-pipeline" href="#" download="fatou_bravo_wolof.mp3">⬇️ Télécharger l'audio</a>
+          <button class="btn btn-secondary" onclick="copyText('res-wolof')">📋 Copier le Wolof</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB : TRANSLATE ONLY ── -->
+  <div id="pane-translate" style="display:none">
+    <div class="card">
+      <div class="card-title">🌍 Traduction Français → Wolof</div>
+      <label>Texte en français <span style="color:var(--muted)">(max 512 caractères)</span></label>
+      <textarea id="text-translate" placeholder="Entrez le texte à traduire en Wolof..." oninput="updateCount('translate')"></textarea>
+      <div class="char-count" id="count-translate">0 / 512</div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runTranslate()" id="btn-translate">🌍 Traduire en Wolof</button>
+        <button class="btn btn-secondary" onclick="clearForm('translate')">Effacer</button>
+      </div>
+      <div class="alert alert-error" id="err-translate"></div>
+    </div>
+    <div class="card result-card" id="res-translate-card">
+      <div class="card-title">✅ Traduction</div>
+      <div class="result-label">Français</div>
+      <div class="result-text" id="res-fr"></div>
+      <div style="margin-top:1rem">
+        <div class="result-label">Wolof</div>
+        <div class="result-text wolof" id="res-wo"></div>
+      </div>
+      <div class="btn-row" style="margin-top:1rem">
+        <button class="btn btn-secondary" onclick="sendToSynth()">🎙️ Envoyer vers Synthèse vocale</button>
+        <button class="btn btn-secondary" onclick="copyText('res-wo')">📋 Copier</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB : SYNTHESIZE ONLY ── -->
+  <div id="pane-synthesize" style="display:none">
+    <div class="card">
+      <div class="card-title">🎙️ Synthèse vocale Wolof</div>
+      <label>Texte en Wolof</label>
+      <textarea id="text-synthesize" placeholder="Collez ici votre texte en Wolof..."></textarea>
+      <div class="controls-row" style="margin-top:1.2rem">
+        <div class="slider-group">
+          <label>🎵 Pitch</label>
+          <div class="slider-wrap">
+            <input type="range" id="pitch-synth" min="-2" max="2" step="0.1" value="0" oninput="updateSlider('pitch-synth','val-pitch-synth')">
+            <span class="slider-val" id="val-pitch-synth">0.0</span>
+          </div>
+        </div>
+        <div class="slider-group">
+          <label>⏱️ Speed</label>
+          <div class="slider-wrap">
+            <input type="range" id="speed-synth" min="0.5" max="2" step="0.1" value="1" oninput="updateSlider('speed-synth','val-speed-synth')">
+            <span class="slider-val" id="val-speed-synth">1.0</span>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" onclick="runSynthesize()" id="btn-synth">🎙️ Générer l'audio</button>
+        <button class="btn btn-secondary" onclick="clearForm('synthesize')">Effacer</button>
+      </div>
+      <div class="alert alert-error" id="err-synth"></div>
+    </div>
+    <div class="card result-card" id="res-synth-card">
+      <div class="card-title">🔊 Audio généré</div>
+      <audio controls id="audio-player-synth" style="width:100%"></audio>
+      <div class="btn-row" style="margin-top:1rem">
+        <a class="btn btn-gold" id="dl-synth" href="#" download="fatou_bravo_wolof.mp3">⬇️ Télécharger</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB : HISTORY ── -->
+  <div id="pane-history" style="display:none">
+    <div class="card">
+      <div class="card-title">📋 Historique des générations</div>
+      <div class="btn-row" style="margin-bottom:1rem">
+        <button class="btn btn-primary" onclick="loadHistory()">🔄 Charger l'historique</button>
+      </div>
+      <div id="history-content">
+        <p style="color:var(--muted);font-size:.9rem">Cliquez sur "Charger l'historique" pour afficher vos requêtes TTS.</p>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<footer>Fatou BRAVO · <span>BRAVO Products Gambia</span> · Propulsé par LAfricaMobile TTS</footer>
+
+<script>
+  // ── SCRIPTS D'EXEMPLE ──
+  const samples = [
+    "As-salāmu alaykum tout le monde ! Moi c'est Fatou BRAVO. Je suis passée au marché ce matin et j'ai pris mes produits BRAVO — la farine, le bouillon, les biscuits ! Les produits BRAVO sont bons, savoureux et accessibles pour toute la famille.",
+    "Aujourd'hui je vous montre comment préparer un délicieux thiéboudienne avec la farine BRAVO et le bouillon BRAVO. Ça donne un goût incroyable ! Essayez chez vous, vous ne serez pas déçus.",
+    "Mesdames, les produits BRAVO sont maintenant disponibles dans votre quartier. Farine, bouillon, biscuits — tout ce dont votre famille a besoin au quotidien. Venez découvrir BRAVO !"
+  ];
+
+  // ── TAB SWITCHING ──
+  function switchTab(tab) {
+    ['pipeline','translate','synthesize','history'].forEach(t => {
+      document.getElementById('pane-'+t).style.display = t===tab ? 'block' : 'none';
+      document.getElementById('tab-'+t).classList.toggle('active', t===tab);
+    });
+  }
+
+  // ── CHAR COUNT ──
+  function updateCount(id) {
+    const ta = document.getElementById('text-'+id);
+    const el = document.getElementById('count-'+id);
+    if (!el) return;
+    const n = ta.value.length;
+    el.textContent = n + ' / 512';
+    el.classList.toggle('warn', n > 480);
+  }
+
+  // ── SLIDER ──
+  function updateSlider(sliderId, valId) {
+    const v = parseFloat(document.getElementById(sliderId).value).toFixed(1);
+    document.getElementById(valId).textContent = v;
+    // update track fill
+    const el = document.getElementById(sliderId);
+    const min = parseFloat(el.min), max = parseFloat(el.max), val = parseFloat(el.value);
+    const pct = ((val - min) / (max - min)) * 100;
+    el.style.background = `linear-gradient(to right, var(--green-l) ${pct}%, var(--border) ${pct}%)`;
+  }
+
+  // ── FILL TEXT FROM SAMPLE ──
+  function fillText(tab, text) {
+    document.getElementById('text-'+tab).value = text;
+    updateCount(tab);
+  }
+
+  // ── CLEAR ──
+  function clearForm(id) {
+    const ta = document.getElementById('text-'+id);
+    if (ta) ta.value = '';
+    updateCount(id);
+  }
+
+  // ── COPY ──
+  function copyText(elId) {
+    const txt = document.getElementById(elId).textContent;
+    navigator.clipboard.writeText(txt).then(() => {
+      alert('Texte copié !');
+    });
+  }
+
+  // ── LOADING STATE ──
+  function setLoading(btnId, loading) {
+    const btn = document.getElementById(btnId);
+    if (loading) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Génération en cours...';
+    } else {
+      btn.disabled = false;
+    }
+  }
+
+  // ── SHOW ERROR ──
+  function showErr(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = '⚠️ ' + msg;
+    el.classList.add('show');
+  }
+  function hideErr(id) {
+    document.getElementById(id).classList.remove('show');
+  }
+
+  // ── SHOW AUDIO ──
+  function showAudio(playerId, dlId, audioUrl) {
+    const player = document.getElementById(playerId);
+    player.src = audioUrl;
+    const dl = document.getElementById(dlId);
+    if (dl) dl.href = audioUrl;
+  }
+
+  // ── SEND TO SYNTH TAB ──
+  function sendToSynth() {
+    const wo = document.getElementById('res-wo').textContent;
+    document.getElementById('text-synthesize').value = wo;
+    switchTab('synthesize');
+  }
+
+  // ════════════════════════════════
+  //  API CALLS
+  // ════════════════════════════════
+
+  // 1. PIPELINE COMPLET
+  async function runPipeline() {
+    hideErr('err-pipeline');
+    const text = document.getElementById('text-pipeline').value.trim();
+    if (!text) { showErr('err-pipeline', 'Veuillez saisir un texte.'); return; }
+    if (text.length > 512) { showErr('err-pipeline', 'Texte trop long (max 512 caractères).'); return; }
+
+    const pitch = parseFloat(document.getElementById('pitch-pipeline').value);
+    const speed = parseFloat(document.getElementById('speed-pipeline').value);
+    const origLabel = document.getElementById('btn-pipeline').innerHTML;
+    setLoading('btn-pipeline', true);
+
+    try {
+      const resp = await fetch('/api/generate/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, pitch, speed })
+      });
+      const data = await resp.json();
+
+      if (!data.success) {
+        showErr('err-pipeline', data.error || 'Erreur inconnue.');
+        return;
+      }
+
+      // Afficher le résultat
+      document.getElementById('res-original').textContent = text;
+      document.getElementById('res-wolof').textContent = data.translated || data.text || '(texte Wolof généré)';
+
+      const resCard = document.getElementById('res-pipeline');
+      resCard.classList.add('show');
+
+      if (data.audio_url) {
+        document.getElementById('audio-section-pipeline').style.display = 'block';
+        showAudio('audio-player-pipeline', 'dl-pipeline', data.audio_url);
+      }
+
+    } catch(e) {
+      showErr('err-pipeline', 'Erreur réseau : ' + e.message);
+    } finally {
+      document.getElementById('btn-pipeline').disabled = false;
+      document.getElementById('btn-pipeline').innerHTML = '<span>✨ Générer la voix Wolof</span>';
+    }
+  }
+
+  // 2. TRADUCTION
+  async function runTranslate() {
+    hideErr('err-translate');
+    const text = document.getElementById('text-translate').value.trim();
+    if (!text) { showErr('err-translate', 'Veuillez saisir un texte.'); return; }
+
+    const origLabel = document.getElementById('btn-translate').innerHTML;
+    setLoading('btn-translate', true);
+
+    try {
+      const resp = await fetch('/api/translate/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      const data = await resp.json();
+
+      if (!data.success) {
+        showErr('err-translate', data.error || 'Erreur inconnue.');
+        return;
+      }
+
+      document.getElementById('res-fr').textContent = data.original;
+      document.getElementById('res-wo').textContent = data.translated;
+      document.getElementById('res-translate-card').classList.add('show');
+
+    } catch(e) {
+      showErr('err-translate', 'Erreur réseau : ' + e.message);
+    } finally {
+      document.getElementById('btn-translate').disabled = false;
+      document.getElementById('btn-translate').innerHTML = '🌍 Traduire en Wolof';
+    }
+  }
+
+  // 3. SYNTHÈSE
+  async function runSynthesize() {
+    hideErr('err-synth');
+    const text = document.getElementById('text-synthesize').value.trim();
+    if (!text) { showErr('err-synth', 'Veuillez saisir un texte Wolof.'); return; }
+
+    const pitch = parseFloat(document.getElementById('pitch-synth').value);
+    const speed = parseFloat(document.getElementById('speed-synth').value);
+    setLoading('btn-synth', true);
+
+    try {
+      const resp = await fetch('/api/synthesize/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, pitch, speed })
+      });
+      const data = await resp.json();
+
+      if (!data.success) {
+        showErr('err-synth', data.error || 'Erreur inconnue.');
+        return;
+      }
+
+      if (data.audio_url) {
+        document.getElementById('res-synth-card').classList.add('show');
+        showAudio('audio-player-synth', 'dl-synth', data.audio_url);
+      }
+
+    } catch(e) {
+      showErr('err-synth', 'Erreur réseau : ' + e.message);
+    } finally {
+      document.getElementById('btn-synth').disabled = false;
+      document.getElementById('btn-synth').innerHTML = '🎙️ Générer l\'audio';
+    }
+  }
+
+  // 4. HISTORIQUE
+  async function loadHistory() {
+    const cont = document.getElementById('history-content');
+    cont.innerHTML = '<p style="color:var(--muted)">Chargement...</p>';
+    try {
+      const resp = await fetch('/api/history/');
+      const data = await resp.json();
+
+      if (!data.success || !data.data || !data.data.length) {
+        cont.innerHTML = '<p style="color:var(--muted);font-size:.9rem">Aucun historique disponible.</p>';
+        return;
+      }
+
+      const ul = document.createElement('ul');
+      ul.className = 'history-list';
+      data.data.forEach(item => {
+        const li = document.createElement('li');
+        li.className = 'history-item';
+        li.innerHTML = `
+          <span class="hi-icon">🔊</span>
+          <span class="hi-text">${item.text || '—'}</span>
+          <span class="hi-date">${item.post_created_at ? new Date(item.post_created_at).toLocaleDateString('fr-FR') : ''}</span>
+        `;
+        if (item.path_audio) {
+          li.title = 'Cliquer pour écouter';
+          li.onclick = () => { window.open(item.path_audio, '_blank'); };
+        }
+        ul.appendChild(li);
+      });
+      cont.innerHTML = '';
+      cont.appendChild(ul);
+
+    } catch(e) {
+      cont.innerHTML = '<p style="color:var(--error)">Erreur : ' + e.message + '</p>';
+    }
+  }
+
+  // ── INIT SLIDERS ──
+  ['pitch-pipeline','speed-pipeline','pitch-synth','speed-synth'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      const val = parseFloat(el.value);
+      const min = parseFloat(el.min), max = parseFloat(el.max);
+      const pct = ((val - min) / (max - min)) * 100;
+      el.style.background = `linear-gradient(to right, var(--green-l) ${pct}%, var(--border) ${pct}%)`;
+    }
+  });
+</script>
+</body>
+</html>
