@@ -43,6 +43,6 @@ STATIC_URL = '/static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # LAfricaMobile API Configuration
-LAM_API_BASE = "https://api.lafricamobile.com"  # à remplacer par l'URL de prod
+LAM_API_BASE = os.environ.get("LAM_API_BASE", "https://ttsapi.lafricamobile.com")
 LAM_LOGIN = os.environ.get("LAM_LOGIN", "votre_login")
 LAM_PASSWORD = os.environ.get("LAM_PASSWORD", "votre_password")
