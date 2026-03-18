@@ -1,7 +1,7 @@
 """
 Service LAfricaMobile TTS
-Gère l'authentification OAuth2, la traduction et la synthèse vocale.
 Base URL : https://ttsapi.lafricamobile.com
+Spec     : openapi.json confirmée le 2026-03-18
 """
 import requests
 from django.conf import settings
@@ -11,89 +11,124 @@ class LAfricaMobileService:
 
     TARGET_LANG = "wo"
 
-    # Endpoints — testés avec et sans trailing slash
-    ENDPOINTS = {
-        "login":      "/login",
-        "tts":        "/tts/",
-        "translate":  "/tts/translate",
-        "vocalize":   "/tts/vocalize",
-    }
-
     def __init__(self):
         self.token = None
+        self.refresh_token = None
         self.BASE_URL = getattr(settings, 'LAM_API_BASE', 'https://ttsapi.lafricamobile.com').rstrip('/')
 
     # ------------------------------------------------------------------ #
-    #  AUTHENTIFICATION OAuth2                                             #
+    #  AUTH  POST /login  (application/x-www-form-urlencoded)             #
     # ------------------------------------------------------------------ #
     def authenticate(self):
         """
-        POST /login
-        Content-Type: application/x-www-form-urlencoded
-        Réponse : { "access_token": "...", "token_type": "bearer" }
+        Réponse : { access_token, refresh_token, token_type }
+        ⚠️  grant_type doit valoir exactement "password" (pattern requis)
         """
-        # On essaie /login puis /login/ si 404
-        for path in ["/login", "/login/"]:
-            url = f"{self.BASE_URL}{path}"
-            payload = {
-                "username":      settings.LAM_LOGIN,
-                "password":      settings.LAM_PASSWORD,
-                "grant_type":    "password",
-                "scope":         "",
-                "client_id":     "",
-                "client_secret": "",
-            }
-            try:
-                resp = requests.post(
-                    url,
-                    data=payload,
-                    headers={"Content-Type": "application/x-www-form-urlencoded"},
-                    timeout=15
-                )
-                if resp.status_code == 404:
-                    continue  # essaie la variante suivante
-                resp.raise_for_status()
-                data = resp.json()
-                self.token = data.get("access_token") or data.get("token")
-                return {"success": True, "token": self.token, "url_used": url}
-            except requests.exceptions.HTTPError as e:
-                return {
-                    "success": False,
-                    "error": str(e),
-                    "status": resp.status_code,
-                    "detail": resp.text,
-                    "url_tried": url,
-                }
-            except requests.exceptions.RequestException as e:
-                return {"success": False, "error": str(e)}
+        url = f"{self.BASE_URL}/login"
+        payload = {
+            "username":      settings.LAM_LOGIN,
+            "password":      settings.LAM_PASSWORD,
+            "grant_type":    "password",   # ← obligatoire, pattern="password"
+            "scope":         "",
+            "client_id":     "",
+            "client_secret": "",
+        }
+        try:
+            resp = requests.post(
+                url,
+                data=payload,
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                timeout=15
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            self.token         = data.get("access_token")
+            self.refresh_token = data.get("refresh_token")
+            return {"success": True, "token": self.token}
+        except requests.exceptions.RequestException as e:
+            detail = ""
+            if hasattr(e, "response") and e.response is not None:
+                detail = e.response.text
+            return {"success": False, "error": str(e), "detail": detail}
 
-        return {"success": False, "error": "Endpoint /login introuvable (404 sur toutes les variantes)."}
+    # ------------------------------------------------------------------ #
+    #  REFRESH  POST /refresh  { refresh_token }                          #
+    # ------------------------------------------------------------------ #
+    def refresh(self):
+        """Renouvelle le access_token via le refresh_token."""
+        if not self.refresh_token:
+            return self.authenticate()
+        url = f"{self.BASE_URL}/refresh"
+        try:
+            resp = requests.post(
+                url,
+                json={"refresh_token": self.refresh_token},
+                timeout=15
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            self.token = data.get("access_token")
+            return {"success": True, "token": self.token}
+        except requests.exceptions.RequestException as e:
+            return self.authenticate()  # fallback → re-login complet
 
     def _headers(self):
         return {
             "Authorization": f"Bearer {self.token}",
-            "Content-Type": "application/json",
+            "Content-Type":  "application/json",
         }
 
     def _ensure_authenticated(self):
         if not self.token:
             result = self.authenticate()
             if not result["success"]:
-                raise ConnectionError(f"Authentification échouée : {result.get('error')} | detail: {result.get('detail','')}")
+                raise ConnectionError(
+                    f"Authentification échouée : {result.get('error')} "
+                    f"| detail: {result.get('detail', '')}"
+                )
 
     # ------------------------------------------------------------------ #
-    #  TRADUCTION  Français → Wolof                                        #
+    #  CRÉDITS  GET /users/me/credits                                     #
+    # ------------------------------------------------------------------ #
+    def get_credits(self) -> dict:
+        """Retourne le solde restant en minutes."""
+        self._ensure_authenticated()
+        url = f"{self.BASE_URL}/users/me/credits"
+        try:
+            resp = requests.get(url, headers=self._headers(), timeout=10)
+            resp.raise_for_status()
+            return {"success": True, "data": resp.json()}
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error": str(e)}
+
+    # ------------------------------------------------------------------ #
+    #  LANGUES DISPONIBLES  GET /tts/languages                            #
+    # ------------------------------------------------------------------ #
+    def get_languages(self) -> dict:
+        self._ensure_authenticated()
+        url = f"{self.BASE_URL}/tts/languages"
+        try:
+            resp = requests.get(url, headers=self._headers(), timeout=10)
+            resp.raise_for_status()
+            return {"success": True, "languages": resp.json()}
+        except requests.exceptions.RequestException as e:
+            return {"success": False, "error": str(e)}
+
+    # ------------------------------------------------------------------ #
+    #  TRADUCTION  POST /tts/translate                                    #
+    #  Body : { text, to_lang }                                           #
+    #  Réponse : { text, to_lang, translated_text, post_created_at }      #
     # ------------------------------------------------------------------ #
     def translate(self, text: str) -> dict:
-        """POST /tts/translate"""
         self._ensure_authenticated()
-        if len(text) > 512:
-            return {"success": False, "error": "Texte trop long (max 512 caractères)"}
-
         url = f"{self.BASE_URL}/tts/translate"
-        payload = {"text": text, "to_lang": self.TARGET_LANG}
         try:
-            resp = requests.post(url, json=payload, headers=self._headers(), timeout=30)
+            resp = requests.post(
+                url,
+                json={"text": text, "to_lang": self.TARGET_LANG},
+                headers=self._headers(),
+                timeout=30
+            )
             resp.raise_for_status()
             data = resp.json()
             return {
@@ -108,26 +143,27 @@ class LAfricaMobileService:
             return {"success": False, "error": str(e), "detail": detail}
 
     # ------------------------------------------------------------------ #
-    #  SYNTHÈSE VOCALE  Texte Wolof → Audio                               #
+    #  SYNTHÈSE  POST /tts/vocalize                                       #
+    #  Body : { text, to_lang, pitch, speed }                             #
+    #  Réponse : { text, to_lang, path_audio, duration, post_created_at } #
     # ------------------------------------------------------------------ #
     def synthesize(self, text: str, pitch: float = 0.0, speed: float = 1.0) -> dict:
-        """POST /tts/vocalize"""
         self._ensure_authenticated()
         url = f"{self.BASE_URL}/tts/vocalize"
-        payload = {
-            "text":    text,
-            "to_lang": self.TARGET_LANG,
-            "pitch":   pitch,
-            "speed":   speed,
-        }
         try:
-            resp = requests.post(url, json=payload, headers=self._headers(), timeout=60)
+            resp = requests.post(
+                url,
+                json={"text": text, "to_lang": self.TARGET_LANG, "pitch": pitch, "speed": speed},
+                headers=self._headers(),
+                timeout=60
+            )
             resp.raise_for_status()
             data = resp.json()
             return {
-                "success":   True,
-                "audio_url": data.get("path_audio", ""),
-                "text":      data.get("text", text),
+                "success":    True,
+                "audio_url":  data.get("path_audio", ""),
+                "text":       data.get("text", text),
+                "duration":   data.get("duration"),
                 "created_at": data.get("post_created_at", ""),
             }
         except requests.exceptions.RequestException as e:
@@ -135,30 +171,28 @@ class LAfricaMobileService:
             return {"success": False, "error": str(e), "detail": detail}
 
     # ------------------------------------------------------------------ #
-    #  PIPELINE COMPLET  Français → Wolof → Audio                         #
+    #  PIPELINE COMPLET  POST /tts/                                       #
+    #  Body : { text, to_lang, pitch, speed }                             #
+    #  Réponse : { text, to_lang, path_audio, duration, post_created_at } #
     # ------------------------------------------------------------------ #
     def full_pipeline(self, text: str, pitch: float = 0.0, speed: float = 1.0) -> dict:
-        """POST /tts/ — traduction + synthèse en une seule requête"""
         self._ensure_authenticated()
-        if len(text) > 512:
-            return {"success": False, "error": "Texte trop long (max 512 caractères)"}
-
         url = f"{self.BASE_URL}/tts/"
-        payload = {
-            "text":    text,
-            "to_lang": self.TARGET_LANG,
-            "pitch":   pitch,
-            "speed":   speed,
-        }
         try:
-            resp = requests.post(url, json=payload, headers=self._headers(), timeout=60)
+            resp = requests.post(
+                url,
+                json={"text": text, "to_lang": self.TARGET_LANG, "pitch": pitch, "speed": speed},
+                headers=self._headers(),
+                timeout=60
+            )
             resp.raise_for_status()
             data = resp.json()
             return {
-                "success":   True,
-                "audio_url": data.get("path_audio", ""),
-                "text":      data.get("text", text),
+                "success":    True,
+                "audio_url":  data.get("path_audio", ""),
+                "text":       data.get("text", text),
                 "translated": data.get("translated_text", ""),
+                "duration":   data.get("duration"),
                 "created_at": data.get("post_created_at", ""),
             }
         except requests.exceptions.RequestException as e:
@@ -166,10 +200,9 @@ class LAfricaMobileService:
             return {"success": False, "error": str(e), "detail": detail}
 
     # ------------------------------------------------------------------ #
-    #  HISTORIQUE  GET /tts/                                               #
+    #  HISTORIQUE  GET /tts/                                              #
     # ------------------------------------------------------------------ #
     def get_history(self) -> dict:
-        """GET /tts/"""
         self._ensure_authenticated()
         url = f"{self.BASE_URL}/tts/"
         try:
