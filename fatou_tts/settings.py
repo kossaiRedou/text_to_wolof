@@ -1,7 +1,11 @@
 from pathlib import Path
 import os
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Charge automatiquement le fichier .env à la racine du projet
+load_dotenv(BASE_DIR / '.env')
 SECRET_KEY = 'django-fatou-bravo-wolof-tts-secret-key-2026'
 DEBUG = True
 ALLOWED_HOSTS = ['*']

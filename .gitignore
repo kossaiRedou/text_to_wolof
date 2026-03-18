@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 *.pyc
 .env
+!.env.example
 db.sqlite3
 *.sqlite3
 .DS_Store
