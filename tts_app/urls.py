@@ -7,4 +7,5 @@ urlpatterns = [
     path('api/synthesize/', views.api_synthesize, name='api_synthesize'),
     path('api/generate/', views.api_full_pipeline, name='api_generate'),
     path('api/history/', views.api_history, name='api_history'),
+    path('api/debug/', views.api_debug_auth, name='api_debug'),
 ]

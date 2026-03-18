@@ -101,3 +101,22 @@ def api_history(request):
         return JsonResponse(result)
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+
+@require_http_methods(["GET"])
+def api_debug_auth(request):
+    """
+    Endpoint de diagnostic : teste l'authentification LAM et affiche le résultat.
+    GET /api/debug/
+    """
+    from django.conf import settings as s
+    svc = LAfricaMobileService()
+    result = svc.authenticate()
+    return JsonResponse({
+        "config": {
+            "LAM_API_BASE": s.LAM_API_BASE,
+            "LAM_LOGIN": s.LAM_LOGIN[:3] + "***" if s.LAM_LOGIN else "(vide)",
+            "LAM_PASSWORD": "***" if s.LAM_PASSWORD else "(vide)",
+        },
+        "auth_result": result
+    })
